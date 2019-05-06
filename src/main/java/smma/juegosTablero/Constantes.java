@@ -10,9 +10,10 @@ package smma.juegosTablero;
  * @author pedroj
  */
 public interface Constantes {
-    public static final long TIME_OUT = 2000; // 2seg
-    public static final long RETARDO_PRESENTACION = 2000; // 2 seg 
-    public static final long BUSCAR_AGENTES = 5000; // 5 seg
+    public static final long TIME_OUT = 2000; // 2segundos
+    public static final long RETARDO_PRESENTACION = 2000; // 2 segundos
+    public static final long SIMULA_JUEGO = 5000; // 5 segundos
+    public static final long BUSCAR_AGENTES = 30000; // 30 segundos
     public static final int NO_HAY_AGENTES = 0;
     public static final int NO_HAY_ELEMENTO = -1;
     public static final int PRIMERO = 0;

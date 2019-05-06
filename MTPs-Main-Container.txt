@@ -1,1 +1,1 @@
-http://macmini-de-pedro-j-sanchez.local:7778/acc
+http://p178-084.ujaen.es:7778/acc

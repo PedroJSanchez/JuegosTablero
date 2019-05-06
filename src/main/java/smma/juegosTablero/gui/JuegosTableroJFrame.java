@@ -5,6 +5,9 @@
  */
 package smma.juegosTablero.gui;
 
+import java.util.List;
+import juegosTablero.Vocabulario.ModoJuego;
+import static juegosTablero.Vocabulario.ModoJuego.UNICO;
 import juegosTablero.Vocabulario.TipoJuego;
 import smma.juegosTablero.agentes.AgenteCentralJuego;
 
@@ -28,9 +31,13 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
         setVisible(true);
         proponerJuego.setEnabled(false);
         completarJuego.setEnabled(false);
+        jComboBoxJuego.removeAllItems();
     }
 
-    public void activaProponerJuego() {
+    public void activaProponerJuego(List<TipoJuego> listaJuegos) {
+        jComboBoxJuego.removeAllItems();
+        for ( TipoJuego juego : listaJuegos )
+            jComboBoxJuego.addItem(juego.toString());
         proponerJuego.setEnabled(true);
     }
     
@@ -39,6 +46,7 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
     }
     
     public void anulaProponerJuego() {
+        jComboBoxJuego.removeAllItems();
         proponerJuego.setEnabled(false);
     }
     
@@ -57,6 +65,10 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
 
         proponerJuego = new javax.swing.JButton();
         completarJuego = new javax.swing.JButton();
+        jComboBoxJuego = new javax.swing.JComboBox<>();
+        jLabel1 = new javax.swing.JLabel();
+        jLabel2 = new javax.swing.JLabel();
+        jComboBoxModo = new javax.swing.JComboBox<>();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setAlwaysOnTop(true);
@@ -81,21 +93,58 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
             }
         });
 
+        jComboBoxJuego.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+        jComboBoxJuego.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jComboBoxJuegoActionPerformed(evt);
+            }
+        });
+
+        jLabel1.setText("Tipo Juego");
+
+        jLabel2.setText("Modo Juego");
+
+        jComboBoxModo.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "UNICO", "TORNEO" }));
+        jComboBoxModo.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jComboBoxModoActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(32, 32, 32)
-                .addComponent(proponerJuego)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 91, Short.MAX_VALUE)
-                .addComponent(completarJuego)
-                .addGap(34, 34, 34))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(proponerJuego)
+                        .addGap(18, 18, 18)
+                        .addComponent(completarJuego)
+                        .addContainerGap(42, Short.MAX_VALUE))
+                    .addGroup(layout.createSequentialGroup()
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel1)
+                            .addComponent(jComboBoxJuego, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(70, 70, 70)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jComboBoxModo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel2))
+                        .addGap(0, 0, Short.MAX_VALUE))))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                .addContainerGap(85, Short.MAX_VALUE)
+                .addGap(27, 27, 27)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel1)
+                    .addComponent(jLabel2))
+                .addGap(18, 18, 18)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jComboBoxModo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jComboBoxJuego, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 91, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(proponerJuego)
                     .addComponent(completarJuego))
@@ -118,17 +167,36 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
 
     private void proponerJuegoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_proponerJuegoActionPerformed
         // TODO add your handling code here:
-        // Proponemos un juego aleatorio entre los posibles y donde hay jugadores
-        TipoJuego tipoJuego;
+        // Proponemos un juego con los parámetros seleccionados
+        ModoJuego modoJuego;
+        TipoJuego tipoJuego = null;
         
-        tipoJuego = agente.buscarJuego();
+        for ( TipoJuego tipo : TipoJuego.values() )
+            if ( jComboBoxJuego.getSelectedItem().toString().equals(tipo.name()) ) {
+                tipoJuego = tipo;
+                break;
+            }
         
-        agente.proponerJuego(tipoJuego);
+        modoJuego = ModoJuego.values()[jComboBoxModo.getSelectedIndex()];
+        
+        agente.proponerJuego(tipoJuego, modoJuego);
     }//GEN-LAST:event_proponerJuegoActionPerformed
+
+    private void jComboBoxJuegoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBoxJuegoActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jComboBoxJuegoActionPerformed
+
+    private void jComboBoxModoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBoxModoActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jComboBoxModoActionPerformed
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton completarJuego;
+    private javax.swing.JComboBox<String> jComboBoxJuego;
+    private javax.swing.JComboBox<String> jComboBoxModo;
+    private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel jLabel2;
     private javax.swing.JButton proponerJuego;
     // End of variables declaration//GEN-END:variables
 

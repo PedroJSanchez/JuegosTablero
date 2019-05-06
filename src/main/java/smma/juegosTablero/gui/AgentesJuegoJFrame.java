@@ -101,7 +101,7 @@ public class AgentesJuegoJFrame extends javax.swing.JFrame {
         });
 
         jLabel1.setFont(new java.awt.Font("Arial", 1, 14)); // NOI18N
-        jLabel1.setText("Central Juegos");
+        jLabel1.setText("Grupo Juegos");
 
         jLabel2.setFont(new java.awt.Font("Arial", 1, 14)); // NOI18N
         jLabel2.setText("Juego Barcos");
