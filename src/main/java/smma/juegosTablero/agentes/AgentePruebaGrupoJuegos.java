@@ -44,7 +44,6 @@ import static juegosTablero.Vocabulario.TIPO_SERVICIO;
 import static juegosTablero.Vocabulario.getOntologia;
 import juegosTablero.dominio.elementos.ClasificacionJuego;
 import juegosTablero.dominio.elementos.CompletarJuego;
-import juegosTablero.dominio.elementos.DetalleInforme;
 import juegosTablero.dominio.elementos.Grupo;
 import juegosTablero.dominio.elementos.Juego;
 import juegosTablero.dominio.elementos.JuegoAceptado;
@@ -258,8 +257,6 @@ public class AgentePruebaGrupoJuegos extends Agent implements Vocabulario, Const
             msg.setLanguage(codec.getName());
             msg.setOntology(listaOntologias[indiceJuego].getName());
             
-            DetalleInforme detalle = new DetalleInforme();
-            detalle.setJuego(juego);
             if ( suscripcion == null ) {
                 guiConsola.mensaje("No se ha creado bien la suscripcion");
             } else {
@@ -268,10 +265,9 @@ public class AgentePruebaGrupoJuegos extends Agent implements Vocabulario, Const
                 clasificacion.setJuego(juego);
                 clasificacion.setListaJugadores(new jade.util.leap.ArrayList((ArrayList) listaJugadores));
                 clasificacion.setListaPuntuacion(new jade.util.leap.ArrayList((ArrayList) puntosJugadores));
-                detalle.setDetalle(clasificacion);
                 
                  try {
-                    manager[indiceJuego].fillContent(msg, detalle);
+                    manager[indiceJuego].fillContent(msg, clasificacion);
                 } catch (Codec.CodecException | OntologyException ex) {
                     guiConsola.mensaje("Error al crear el Informe del Juego \n" + ex);
                 }

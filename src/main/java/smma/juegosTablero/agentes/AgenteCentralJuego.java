@@ -7,6 +7,7 @@ package smma.juegosTablero.agentes;
 
 import jade.content.Concept;
 import jade.content.ContentManager;
+import jade.content.Predicate;
 import jade.content.lang.Codec;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.BeanOntologyException;
@@ -41,7 +42,6 @@ import juegosTablero.aplicacion.barcos.JuegoBarcos;
 import juegosTablero.aplicacion.conecta4.JuegoConecta4;
 import juegosTablero.aplicacion.domino.JuegoDomino;
 import juegosTablero.dominio.elementos.ClasificacionJuego;
-import juegosTablero.dominio.elementos.Informe;
 import juegosTablero.dominio.elementos.Gestor;
 import juegosTablero.dominio.elementos.Juego;
 import juegosTablero.dominio.elementos.JuegoAceptado;
@@ -54,8 +54,8 @@ import smma.juegosTablero.Constantes;
 import static smma.juegosTablero.Constantes.ENFRENTAMIENTO.MEJOR_UNO;
 import static juegosTablero.Vocabulario.getOntologia;
 import juegosTablero.dominio.elementos.CompletarJuego;
-import juegosTablero.dominio.elementos.DetalleInforme;
 import juegosTablero.dominio.elementos.Grupo;
+import juegosTablero.dominio.elementos.IncidenciaJuego;
 import juegosTablero.dominio.elementos.InformarJuego;
 import smma.juegosTablero.gui.AgentesJuegoJFrame;
 import smma.juegosTablero.gui.ClasificacionJuegoJFrame;
@@ -729,26 +729,26 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         @Override
         protected void handleInform(ACLMessage inform) {
             // Versión preliminar
-            DetalleInforme elemento;
+            Predicate elemento;
             
             // Buscamos la ontología del mensaje
             int indiceJuego = buscarIndiceJuego(inform.getOntology());
             
             try {
-                elemento = (DetalleInforme) manager[indiceJuego].extractContent(inform);
+                elemento = (Predicate) manager[indiceJuego].extractContent(inform);
                 
-                if ( elemento.getDetalle() instanceof ClasificacionJuego ) {
+                if ( elemento instanceof ClasificacionJuego ) {
                     // Presentamos la clasificación del juego
                     ClasificacionJuegoJFrame guiClasificacion;
-                    ClasificacionJuego clasificacion = (ClasificacionJuego) elemento.getDetalle();
+                    ClasificacionJuego clasificacion = (ClasificacionJuego) elemento;
                     guiClasificacion = new ClasificacionJuegoJFrame(clasificacion);
                     guiConsola.mensaje("Fin Juego \n" + clasificacion.getJuego() + "\n" +
                             clasificacion.getListaJugadores() + "\n" + clasificacion.getListaPuntuacion());
                 } else {
                     // Ha ocurrido un problema en el juego
-                    Informe informe = (Informe) elemento.getDetalle();
-                    guiConsola.mensaje("Error en el juego " + informe.getJuego() + "\n" 
-                                       + " por " + informe.getDetalle());
+                    IncidenciaJuego incidencia = (IncidenciaJuego) elemento;
+                    guiConsola.mensaje("Error en el juego " + incidencia.getJuego() + "\n" 
+                                       + " por " + incidencia.getDetalle());
                 }
             } catch (Codec.CodecException | OntologyException ex) {
                 guiConsola.mensaje("Error en el formato del mensaje del agente " + 
