@@ -14,7 +14,7 @@ public interface Constantes {
     public static final long RETARDO_PRESENTACION = 2000; // 2 segundos
     public static final long SIMULA_JUEGO = 5000; // 5 segundos
     public static final long BUSCAR_AGENTES = 30000; // 30 segundos
-    public static final int NO_HAY_AGENTES = 0;
+    public static final int VACIO = 0;
     public static final int NO_HAY_ELEMENTO = -1;
     public static final int PRIMERO = 0;
     public static final int DOS_JUGADORES = 2;
@@ -24,13 +24,14 @@ public interface Constantes {
     public static final int MAYOR = 1;
     public static final int D10 = 10;
     public static final int AFIRMATIVA = 7;
+    public static final String PREFIJO_ID = "Dyy"; // Formato fecha para el idJuego
     
-    public static enum ENFRENTAMIENTO {
+    public static enum Enfrentamiento {
         MEJOR_UNO(1), MEJOR_TRES(2), MEJOR_CINCO(3);
         
         private final int numVictorias;
 
-        private ENFRENTAMIENTO(int numVictorias) {
+        private Enfrentamiento(int numVictorias) {
             this.numVictorias = numVictorias;
         }
 

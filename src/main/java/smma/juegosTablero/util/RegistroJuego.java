@@ -5,9 +5,13 @@
  */
 package smma.juegosTablero.util;
 
+import jade.core.AID;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import juegosTablero.dominio.elementos.Jugador;
 import juegosTablero.dominio.elementos.ProponerJuego;
+import static smma.juegosTablero.Constantes.NO_HAY_ELEMENTO;
 
 /**
  *
@@ -15,7 +19,7 @@ import juegosTablero.dominio.elementos.ProponerJuego;
  */
 public class RegistroJuego {
     private final ProponerJuego juegoPropuesto;
-    private final List listaJugadores;
+    private final List<Jugador> listaJugadores;
 
     public RegistroJuego(ProponerJuego juegoPropuesto) {
         this.juegoPropuesto = juegoPropuesto;
@@ -26,8 +30,46 @@ public class RegistroJuego {
         return juegoPropuesto;
     }
 
-    public List getListaJugadores() {
+    public List<Jugador> getListaJugadores() {
         return listaJugadores;
+    }
+    
+    public boolean jugadorAusente(AID agenteJugador) {
+        
+        Jugador jugador = new Jugador("",agenteJugador);
+        return !listaJugadores.contains(jugador);
+    }
+    
+    public boolean jugadorAusente(Jugador jugador) {
+        return !listaJugadores.contains(jugador);
+    }
+    
+    public Jugador eliminaJugador(AID agenteJugador) {
+        Jugador jugador = null;
+        
+        Iterator it = listaJugadores.iterator();
+        boolean encontrado = false;
+        while ( it.hasNext() && !encontrado ) {
+            jugador = (Jugador) it.next();
+            encontrado = jugador.getAgenteJugador().equals(agenteJugador);
+        }
+        
+        if ( encontrado ) {
+            listaJugadores.remove(jugador);
+        }
+        
+        return jugador;
+    }
+    
+    public Jugador eliminarJugador(Jugador jugador) {
+        Jugador resultado = null;
+        
+        int index = listaJugadores.indexOf(jugador);
+        if ( index != NO_HAY_ELEMENTO ) {
+            jugador = listaJugadores.remove(index);
+        }    
+        
+        return jugador; 
     }
 
     /**
@@ -40,6 +82,6 @@ public class RegistroJuego {
     
     @Override
     public String toString() {
-        return "RegistroJuego{" + "juegoPropueto=" + juegoPropuesto + ", listaJugadores=" + listaJugadores + '}';
+        return "RegistroJuego{" + "juegoPropuesto=" + juegoPropuesto + ", listaJugadores=" + listaJugadores + '}';
     }
 }

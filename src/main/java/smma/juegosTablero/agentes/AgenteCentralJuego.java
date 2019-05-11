@@ -23,7 +23,9 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.proto.ProposeInitiator;
 import jade.proto.SubscriptionInitiator;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -51,7 +53,6 @@ import juegosTablero.dominio.elementos.ProponerJuego;
 import smma.juegosTablero.gui.Consola;
 import smma.juegosTablero.gui.JuegosTableroJFrame;
 import smma.juegosTablero.Constantes;
-import static smma.juegosTablero.Constantes.ENFRENTAMIENTO.MEJOR_UNO;
 import static juegosTablero.Vocabulario.getOntologia;
 import juegosTablero.dominio.elementos.CompletarJuego;
 import juegosTablero.dominio.elementos.Grupo;
@@ -86,12 +87,14 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     private TipoJuego[] listaJuegos;
 
     // Variables agente
+    private String preIdJuego;
     private int numJuego;
     private Gestor agenteCentralJuego;
     private List<AID>[] listaAgentes;
     private List<RegistroGrupoJuegos>[] registroGrupoJuegos;
     private List<RegistroJugador>[] registroJugadores;
     private Map<String, RegistroJuego> registroJuegos;
+    private List<RegistroJuego> juegosPendientes;
     private int[] minJugadores;
     private List<TipoJuego> tipoJuegosActivos;
 
@@ -103,6 +106,8 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     @Override
     protected void setup() {
         // Inicialización de las variables
+        SimpleDateFormat sdf = new SimpleDateFormat(PREFIJO_ID);
+        preIdJuego = sdf.format(new Date()).toString();
         numJuego = 0;
         agenteCentralJuego = new Gestor("Agente Central Juego", this.getAID());
         guiConsola = new Consola(this);
@@ -114,6 +119,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         listaJuegos = TipoJuego.values();
         tipoJuegosActivos = new ArrayList();
         registroJuegos = new HashMap();
+        juegosPendientes = new ArrayList();
 
         // Tipos de Agentes
         listaAgentes = new List[tiposAgentes.length];
@@ -171,24 +177,45 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     }
 
     private void addAgentesJugador(ACLMessage msg, Juego juego, int numAgentes) {
-        String idJuego = juego.getIdJuego();
+        AID agenteJugador;
+        
+        RegistroJuego juegoActual = registroJuegos.get(juego.getIdJuego());
         TipoJuego tipoJuego = juego.getTipoJuego();
         ModoJuego modo = juego.getModoJuego();
+        List<RegistroJugador> listaJugadores = registroJugadores[tipoJuego.ordinal()];
+        Iterator it = listaAgentes[tipoJuego.ordinal() + 1].iterator();
         
-        if ( registroJuegos.containsKey(idJuego) ) {
-            // El juego ya está registrado
-            List listaJugadores = registroJuegos.get(idJuego).getListaJugadores();
-        }
-        
-        if (modo.equals(TORNEO)) {
-            Iterator it = listaAgentes[tipoJuego.ordinal() + 1].iterator();
-            while (it.hasNext()) {
-                msg.addReceiver((AID) it.next());
+        if ( modo.equals(TORNEO) ) {
+            while ( it.hasNext() ) {
+                agenteJugador = (AID) it.next();
+                if ( juegoActual.jugadorAusente(agenteJugador) ) {
+                    msg.addReceiver(agenteJugador);
+                }
             }
         } else {
-            for (int i = 0; i < numAgentes; i++) {
-                AID jugador = listaAgentes[tipoJuego.ordinal() + 1].get(i);
-                msg.addReceiver(jugador);
+            int encontrados = 0;
+            while ( (encontrados < numAgentes) && it.hasNext() ) {
+                // Primero añadimos agentes no contactados previamente
+                agenteJugador = (AID) it.next();
+                RegistroJugador registroJugador = new RegistroJugador(new Jugador("",agenteJugador));
+                int indice = listaJugadores.indexOf(registroJugador);
+                if ( (indice == NO_HAY_ELEMENTO) && juegoActual.jugadorAusente(agenteJugador) ) {
+                    msg.addReceiver(agenteJugador);
+                    encontrados++;
+                }
+            }
+            
+            // Completamos con agentes ya contactados previamente
+            // Priorizando los que menos juegos han aceptado
+            Collections.sort(listaJugadores);
+            numAgentes = numAgentes - encontrados;
+            it = listaJugadores.iterator();
+            while ( it.hasNext() && (encontrados < numAgentes) ) {
+                RegistroJugador registroJugador = (RegistroJugador) it.next();
+                if ( juegoActual.jugadorAusente(registroJugador.getJugador()) ) {
+                    msg.addReceiver(registroJugador.getJugador().getAgenteJugador());
+                    encontrados++;
+                }
             }
         }
     }
@@ -201,46 +228,161 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         }
     }
 
+    /**
+     * El juego queda pendiente para localizar los agentes que fantan más
+     * adelante
+     * @param juego 
+     */
+    private void addJuegoPendiente(Juego juego) {
+        RegistroJuego registroJuego = registroJuegos.remove(juego.getIdJuego());
+        juegosPendientes.add(registroJuego);
+        guiAgente.activaPendiente(juegosPendientes);
+    }
+    
+    /**
+     * Elimina el agente jugador de los juegos que han sido propuestos y aceptados
+     * por el agente jugador
+     * @param agenteJugador 
+     */
+    private void eliminarJugador(AID agenteJugador) {
+        Iterator it;
+        Jugador jugador;
+        
+        // Lo eliminamos de los juegos pendientes
+        for( RegistroJuego pendiente : juegosPendientes ) {
+            jugador = pendiente.eliminaJugador(agenteJugador);
+            if ( jugador != null ) {
+                TipoJuego tipo = pendiente.getJuegoPropuesto().getJuego().getTipoJuego();
+                registroJugadores[tipo.ordinal()].remove(new RegistroJugador(jugador));
+                guiConsola.mensaje("Jugador eliminado: " + jugador + 
+                            " del juego " + pendiente + "\n" + registroJugadores[tipo.ordinal()] +
+                            "\njugadores que quedan " + pendiente.numJugadores());
+            }
+                
+        } 
+        
+        // Comprobamos también los que están para completar
+        it = registroJuegos.values().iterator();
+        while ( it.hasNext() ) {
+            RegistroJuego juegoCompleto = (RegistroJuego) it.next();
+            String idJuego = juegoCompleto.getJuegoPropuesto().getJuego().getIdJuego();
+            TipoJuego tipo = juegoCompleto.getJuegoPropuesto().getJuego().getTipoJuego();
+            jugador = juegoCompleto.eliminaJugador(agenteJugador);
+            if ( jugador != null ) {
+                registroJugadores[tipo.ordinal()].remove(new RegistroJugador(jugador));
+                guiConsola.mensaje("Jugador eliminado: " + jugador + 
+                                " del juego " + juegoCompleto + "\n" + registroJugadores[tipo.ordinal()] +
+                                "\njugadores que quedan " + juegoCompleto.numJugadores());
+                
+                // Comprobamos que le queden el mínimo de jugadores
+                if ( juegoCompleto.numJugadores() < minJugadores[tipo.ordinal()] ) {
+                    // El juego pasa a pendientes por no tener el mínimo de jugadores
+                    juegosPendientes.add(juegoCompleto);
+                    it.remove(); // Lo eliminamos del registro de juegos 
+                    guiConsola.mensaje("El juego " + idJuego + "\nno tiene el mínimo de jugadores");
+                }
+            }
+        }
+        
+        guiAgente.activaPendiente(juegosPendientes);
+        guiAgente.activaCompletarJuego(registroJuegos.keySet());
+    }
+    
+    /**
+     * Contacta con nuevos jugadores para completar la lista de jugadores con 
+     * el mínumo necesario para un juego que no alcanzó ese mínimo cuando se intentó
+     * anteriormente.
+     * @param index 
+     */
+    public void juegoPendiente(int index) {
+        RegistroJuego pendiente = juegosPendientes.remove(index);
+        ProponerJuego proponerJuego = pendiente.getJuegoPropuesto();
+        Juego juego = proponerJuego.getJuego();
+        TipoJuego tipoJuego = juego.getTipoJuego();
+        int numJugadores = minJugadores[tipoJuego.ordinal()] - pendiente.numJugadores();
+        guiConsola.mensaje("Se vuelve a proponer el juego pendiente\n" + pendiente + 
+                            "\nbuscamos " + numJugadores + " nuevos jugadores");
+        
+        // Registramos el juego
+        registroJuegos.put(juego.getIdJuego(), pendiente);
+        
+        ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
+        msg.setProtocol(FIPANames.InteractionProtocol.FIPA_PROPOSE);
+        msg.setSender(getAID());
+        addAgentesJugador(msg, juego, numJugadores);
+        msg.setLanguage(codec.getName());
+        msg.setOntology(listaOntologias[tipoJuego.ordinal()].getName());
+        msg.setReplyByDate(new Date(System.currentTimeMillis() + TIME_OUT));
+        
+        if ( msg.getAllReceiver().hasNext() ) {
+            Action ac = new Action(this.getAID(), proponerJuego);
+        
+            try {
+                manager[tipoJuego.ordinal()].fillContent(msg, ac);
+            } catch (Codec.CodecException | OntologyException ex) {
+                guiConsola.mensaje("Error en la construcción del mensaje en Proponer Juego \n" + ex);
+            }
+
+            // Creamos la tarea para buscar jugadores
+            addBehaviour(new TareaProponerJuego(this, msg, pendiente, minJugadores[tipoJuego.ordinal()]));
+            guiConsola.mensaje(msg.toString());
+        } else {
+            // No hay agentes disponibles para el juego
+            guiConsola.mensaje("No hay jugadores para " + juego);
+            addJuegoPendiente(juego);
+        } 
+    }
+    
+    /**
+     * Elimina de la lista de juegos pendientes de completar el que se indica en el 
+     * índice
+     * @param index 
+     */
+    public void eliminarJuego(int index) {
+        RegistroJuego pendiente = juegosPendientes.remove(index);
+        guiConsola.mensaje("Se ha eliminado el juego pendiente\n" + pendiente);
+    }
+    
     private void addRegistroJugador(Juego juego, Jugador jugador) {
         String idJuego = juego.getIdJuego();
         TipoJuego tipoJuego = juego.getTipoJuego();
         List listaAgentes = registroJuegos.get(idJuego).getListaJugadores();
 
         listaAgentes.add(jugador);
-        int indice = registroJugadores[tipoJuego.ordinal()].indexOf(jugador);
+        RegistroJugador registroJugador = new RegistroJugador(jugador);
+        int indice = registroJugadores[tipoJuego.ordinal()].indexOf(registroJugador);
         if (indice == NO_HAY_ELEMENTO) {
-            registroJugadores[tipoJuego.ordinal()].add(new RegistroJugador(jugador));
+            // Es la primera aceptación para participar en un juego de este jugador
+            registroJugadores[tipoJuego.ordinal()].add(registroJugador);
         } else {
-            RegistroJugador registroJugador = registroJugadores[tipoJuego.ordinal()].get(indice);
+            registroJugador = registroJugadores[tipoJuego.ordinal()].get(indice);
             registroJugador.addJuego();
         }
-    }
-
-    private void addCentralJuegos(ACLMessage msg, Juego juego) {
-        // Versión inicial
-        msg.addReceiver(listaAgentes[GRUPO_JUEGOS.ordinal()].get(PRIMERO));
+        guiConsola.mensaje(registroJugadores[tipoJuego.ordinal()].toString());
     }
 
     private void addRegistroGrupoJuegos(Grupo agenteGrupo, Juego juego) {
         TipoJuego tipoJuego = juego.getTipoJuego();
-        int indice = registroGrupoJuegos[tipoJuego.ordinal()].indexOf(agenteGrupo);
+        RegistroGrupoJuegos registroGrupo = new RegistroGrupoJuegos(agenteGrupo);
+        int indice = registroGrupoJuegos[tipoJuego.ordinal()].indexOf(registroGrupo);
         if (indice == NO_HAY_ELEMENTO) {
-            registroGrupoJuegos[tipoJuego.ordinal()].add(new RegistroGrupoJuegos(agenteGrupo));
+            // No se ha contactado antes con este agente de grupo de juegos
+            registroGrupoJuegos[tipoJuego.ordinal()].add(registroGrupo);
             addSuscripcion(agenteGrupo.getAgenteGrupoJuegos(),juego.getTipoJuego());
         }
         
-        // Eliminamos el juego del registro pendiente para que sea completado
+        // Eliminamos el juego del registro pendiente y espera a que sea completado
         registroJuegos.remove(juego.getIdJuego());
     }
 
     /**
      * Controla el botón para completar juegos
      */
-    private void juegosPendientes() {
-        if (!registroJuegos.isEmpty() && (listaAgentes[GRUPO_JUEGOS.ordinal()].size() != NO_HAY_AGENTES)) {
-            guiAgente.activaCompletarJuego();
+    private void juegosDisponibles() {
+        if (!registroJuegos.isEmpty() && (listaAgentes[GRUPO_JUEGOS.ordinal()].size() != VACIO)) {
+            guiAgente.activaCompletarJuego(registroJuegos.keySet());
         } else {
-            guiAgente.anulaCompletarJuego();
+            guiAgente.anulaCompletarJuego(registroJuegos.keySet());
         }
     }
     
@@ -261,38 +403,39 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         return resultado;
     }
     
-    public void proponerJuego(TipoJuego tipoJuego, ModoJuego modoJuego) {
+    public void proponerJuego(TipoJuego tipoJuego, ModoJuego modoJuego, int victorias) {
         ProponerJuego proponerJuego;
-        ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
-        String idJuego = tipoJuego.name() + "_" + numJuego;
-        Juego juego = null;
+        Juego juego;
         
-        if ( registroJuegos.containsKey(idJuego) ) {
-            // El juego ya está registrado pero no tiene suficientes jugadores
-            proponerJuego = registroJuegos.get(idJuego).getJuegoPropuesto();
-        } else {
-            // El juego no está registrado
-            proponerJuego = new ProponerJuego();
-            juego = new Juego(idJuego, MEJOR_UNO.victorias(), modoJuego, tipoJuego);
-            proponerJuego.setJuego(juego);
-            switch (tipoJuego) { // Condiciones estandar para el juego
-                case BARCOS:
-                    proponerJuego.setTipoJuego(new JuegoBarcos());
-                    break;
-                case CONECTA_4:
-                    proponerJuego.setTipoJuego(new JuegoConecta4());
-                    break;
-                case DOMINO:
-                    proponerJuego.setTipoJuego(new JuegoDomino());
-                    break;
-            }
+        numJuego++;
+        String idJuego = tipoJuego.name() + "_" + preIdJuego + "-"+ numJuego;
+        proponerJuego = new ProponerJuego();
+        juego = new Juego(idJuego, victorias, modoJuego, tipoJuego);
+        proponerJuego.setJuego(juego);
+        switch (tipoJuego) { // Condiciones estandar para el juego
+            case BARCOS:
+                proponerJuego.setTipoJuego(new JuegoBarcos());
+                break;
+            case CONECTA_4:
+                proponerJuego.setTipoJuego(new JuegoConecta4());
+                break;
+            case DOMINO:
+                proponerJuego.setTipoJuego(new JuegoDomino());
+                break;
+        }
+        
+        // Registramos el juego
+        addRegistroJuego(proponerJuego);
 
-            msg.setProtocol(FIPANames.InteractionProtocol.FIPA_PROPOSE);
-            msg.setSender(getAID());
-            msg.setLanguage(codec.getName());
-            msg.setOntology(listaOntologias[tipoJuego.ordinal()].getName());
-            msg.setReplyByDate(new Date(System.currentTimeMillis() + TIME_OUT));
+        ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
+        msg.setProtocol(FIPANames.InteractionProtocol.FIPA_PROPOSE);
+        msg.setSender(getAID());
+        addAgentesJugador(msg, juego, minJugadores[tipoJuego.ordinal()]);
+        msg.setLanguage(codec.getName());
+        msg.setOntology(listaOntologias[tipoJuego.ordinal()].getName());
+        msg.setReplyByDate(new Date(System.currentTimeMillis() + TIME_OUT));
 
+        if ( msg.getAllReceiver().hasNext() ) {
             Action ac = new Action(this.getAID(), proponerJuego);
         
             try {
@@ -301,59 +444,48 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                 guiConsola.mensaje("Error en la construcción del mensaje en Proponer Juego \n" + ex);
             }
 
-            // Registramos el juego
-            
-        }
-        
-        addRegistroJuego(proponerJuego);
-        
-        addAgentesJugador(msg, juego, minJugadores[tipoJuego.ordinal()]);
-        
-        if ( msg.getAllReceiver().hasNext() ) {
-            // Si hay agentes con los que contactar
-            addBehaviour(new TareaProponerJuego(this, msg, juego, minJugadores[tipoJuego.ordinal()]));
+            // Creamos la tarea para buscar jugadores
+            addBehaviour(new TareaProponerJuego(this, msg, registroJuegos.get(idJuego), minJugadores[tipoJuego.ordinal()]));
             guiConsola.mensaje(msg.toString());
-        }
+        } else {
+            // No hay agentes disponibles para el juego
+            guiConsola.mensaje("No hay jugadores para " + juego);
+            addJuegoPendiente(juego);
+        } 
     }
 
-    public void completarJuego() {
-        Iterator it = registroJuegos.keySet().iterator();
-
-        // Seleccionamos el primer juego sin completar
-        if (it.hasNext()) {
-            String idJuego = (String) it.next();
-            RegistroJuego juegoRegistrado = registroJuegos.get(idJuego);
-            Juego juego = juegoRegistrado.getJuegoPropuesto().getJuego();
-            TipoJuego tipoJuego = juego.getTipoJuego();
-            Concept condicionesJuego = juegoRegistrado.getJuegoPropuesto().getTipoJuego();
-            List listaJugadores = juegoRegistrado.getListaJugadores();
-            CompletarJuego completarJuego = new CompletarJuego(juego, condicionesJuego, 
-                                                         new jade.util.leap.ArrayList((ArrayList) listaJugadores));
+    public void completarJuego(int indiceAgente, String idJuego) {
+        RegistroJuego juegoRegistrado = registroJuegos.get(idJuego);
+        Juego juego = juegoRegistrado.getJuegoPropuesto().getJuego();
+        TipoJuego tipoJuego = juego.getTipoJuego();
+        Concept condicionesJuego = juegoRegistrado.getJuegoPropuesto().getTipoJuego();
+        List listaJugadores = juegoRegistrado.getListaJugadores();
+        CompletarJuego completarJuego = new CompletarJuego(juego, condicionesJuego, 
+                                                     new jade.util.leap.ArrayList((ArrayList) listaJugadores));
             
-            // Creamos el mensaje
-            ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
-            msg.setProtocol(FIPANames.InteractionProtocol.FIPA_PROPOSE);
-            msg.setSender(getAID());
-            msg.setLanguage(codec.getName());
-            msg.setOntology(listaOntologias[tipoJuego.ordinal()].getName());
-            addCentralJuegos(msg, juego);
-            msg.setReplyByDate(new Date(System.currentTimeMillis() + TIME_OUT));
+        // Creamos el mensaje
+        ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
+        msg.setProtocol(FIPANames.InteractionProtocol.FIPA_PROPOSE);
+        msg.setSender(getAID());
+        msg.setLanguage(codec.getName());
+        msg.setOntology(listaOntologias[tipoJuego.ordinal()].getName());
+        msg.addReceiver(listaAgentes[GRUPO_JUEGOS.ordinal()].get(indiceAgente));
+        msg.setReplyByDate(new Date(System.currentTimeMillis() + TIME_OUT));
 
-            if ( msg.getAllReceiver().hasNext() ) {
-                Action ac = new Action(this.getAID(), completarJuego);
+        if ( msg.getAllReceiver().hasNext() ) {
+            Action ac = new Action(this.getAID(), completarJuego);
             
-                try {
-                    manager[tipoJuego.ordinal()].fillContent(msg, ac);
-                } catch (Codec.CodecException | OntologyException ex) {
-                    guiConsola.mensaje("Error en la construcción del mensaje en Completar Juego \n" + ex);
-                }
-
-                guiConsola.mensaje(msg.toString());
-                addBehaviour(new TareaCompletarJuego(this, msg, juego));
-            } else {
-                // No hay agentes disponibles para el juego
-                guiConsola.mensaje("No hay grupo de juegos posibles para completar: " + juego);
+            try {
+                manager[tipoJuego.ordinal()].fillContent(msg, ac);
+            } catch (Codec.CodecException | OntologyException ex) {
+                guiConsola.mensaje("Error en la construcción del mensaje en Completar Juego \n" + ex);
             }
+
+            guiConsola.mensaje(msg.toString());
+            addBehaviour(new TareaCompletarJuego(this, msg, juego));
+        } else {
+            // No hay agentes disponibles para el juego
+            guiConsola.mensaje("No hay grupo de juegos posibles para completar: " + juego);
         }
     }
 
@@ -413,11 +545,14 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                         
                         if ( !servicio.equals(GRUPO_JUEGOS) && 
                              (listaAgentes[servicio.ordinal()].size() >= minJugadores[servicio.ordinal() - 1]) &&
-                             !tipoJuegosActivos.contains(listaJuegos[servicio.ordinal() - 1]) )
+                             !tipoJuegosActivos.contains(listaJuegos[servicio.ordinal() - 1]) ) {
                             // Juegos que tienen el mínimo de jugadores necesarios
                             tipoJuegosActivos.add(listaJuegos[servicio.ordinal() - 1]);
-                        else 
-                            juegosPendientes();
+                        } else if ( servicio.equals(GRUPO_JUEGOS) ) {
+                            guiAgente.agentesGrupoJuegos(listaAgentes[servicio.ordinal()]);
+                        } else {
+                            juegosDisponibles();
+                        }
                         break;
                     }
                 }        
@@ -434,17 +569,27 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
          */
         @Override
         public void onDeregister(DFAgentDescription dfad) {
+            AID agente = dfad.getName();
+            
             for ( NombreServicio servicio : tiposAgentes ) {
-                if ( listaAgentes[servicio.ordinal()].remove(dfad.getName()) ) {
+                if ( listaAgentes[servicio.ordinal()].remove(agente) ) {
                     guiAgentesJuego.addAgente(listaAgentes[servicio.ordinal()], servicio);
+                    
+                    if( !servicio.equals(GRUPO_JUEGOS) ) {
+                        // Eliminamos el jugador de los juegos que tenga aceptados y pendientes
+                        eliminarJugador(agente);
+                    }
                         
                     if ( !servicio.equals(GRUPO_JUEGOS) && 
                         (listaAgentes[servicio.ordinal()].size() < minJugadores[servicio.ordinal() - 1]) ) {
                         // Juegos que tienen el mínimo de jugadores necesarios
                         tipoJuegosActivos.remove(listaJuegos[servicio.ordinal() - 1]);
-                        
-                    } else 
-                        juegosPendientes();
+                     
+                    } else if ( servicio.equals(GRUPO_JUEGOS) ) {
+                        guiAgente.agentesGrupoJuegos(listaAgentes[servicio.ordinal()]);
+                    } else {
+                        juegosDisponibles();
+                    }
                     break;
                 }
             }
@@ -457,20 +602,27 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     }
 
     class TareaProponerJuego extends ProposeInitiator {
-
+        
         private final Juego juego;
         private final int numJugadores;
         private final List<AID> agentesContactados;
 
-        public TareaProponerJuego(Agent a, ACLMessage msg, Juego juego, int numJugadores) {
+        public TareaProponerJuego(Agent a, ACLMessage msg, RegistroJuego juegoActual, int numJugadores) {
             super(a, msg);
-            this.juego = juego;
+            this.juego = juegoActual.getJuegoPropuesto().getJuego();
             this.numJugadores = numJugadores;
-            
             this.agentesContactados = new ArrayList();
+            
             Iterator it = msg.getAllIntendedReceiver();
-            while ( it.hasNext() )
+            while ( it.hasNext() ) {
                 agentesContactados.add((AID)it.next());
+            }
+            
+            it = juegoActual.getListaJugadores().iterator();
+            while( it.hasNext() ) {
+                Jugador jugador = (Jugador) it.next();
+                agentesContactados.add(jugador.getAgenteJugador());
+            }
         }
 
         @Override
@@ -529,10 +681,8 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
             if ( juegoRegistrado.numJugadores() < numJugadores) {
                 completarJuego();
             } else {
-                guiConsola.mensaje("Juego(" + juego.getIdJuego() + ") se ha registrado\n"
-                        + registroJuegos.get(juego.getIdJuego()));
-                numJuego++;
-                juegosPendientes();
+                guiConsola.mensaje("Juego(" + juego.getIdJuego() + ") se ha registrado\n" + juegoRegistrado);
+                juegosDisponibles();
             }
         }
 
@@ -559,16 +709,15 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
             msg.setReplyByDate(new Date(System.currentTimeMillis() + TIME_OUT));
 
             // Añadimos a los jugadores que nos faltan para completar el juego
-            List listaJugadores = juegoPropuesto.getListaJugadores();
             if (modoJuego.equals(UNICO)) {
                 // Contactamos con nuevos jugadores para podere completar el juego
                 // si es un juego individual
-                int numAgentes = numJugadores - listaJugadores.size();
+                int numAgentes = numJugadores - juegoPropuesto.numJugadores();
                 int total = 0;
                 Iterator it = listaAgentes[tipoJuego.ordinal() + 1].iterator();
                 while ( it.hasNext() && (total < numAgentes) ) {
                     jugador = (AID) it.next();
-                    if ( !listaJugadores.contains(jugador) && 
+                    if ( juegoPropuesto.jugadorAusente(jugador) && 
                          !agentesContactados.contains(jugador) ) {
                         msg.addReceiver(jugador);
                         agentesContactados.add(jugador);
@@ -591,8 +740,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                 reset(msg);
             } else {
                 guiConsola.mensaje("No se han encontrado suficientes jugadores para el juego: " + juego);
-                registroJuegos.remove(juego.getIdJuego());
-                numJuego++;
+                addJuegoPendiente(juego);
             }
         }
     }
@@ -634,7 +782,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                             Grupo agenteGrupo = (Grupo) juegoAceptado.getAgenteJuego();
                             addRegistroGrupoJuegos(agenteGrupo, juego);
                             guiConsola.mensaje(juegoAceptado.toString());
-                            juegosPendientes();
+                            juegosDisponibles();
                         } catch (Codec.CodecException | OntologyException ex) {
                             guiConsola.mensaje("Error en la construcción del mensaje de " + msg.getSender().getLocalName() +
                                     "\n" + msg);
@@ -644,7 +792,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                     case ACLMessage.REJECT_PROPOSAL:
                         try {
                             Motivacion motivacion = (Motivacion) manager[tipoJuego.ordinal()].extractContent(msg);
-                            guiConsola.mensaje(motivacion.toString());
+                            guiConsola.mensaje(motivacion.toString() + "\nBuscamos un agente grupo de juego alternativo");
                             completarPropuesta();
                         } catch (Codec.CodecException | OntologyException ex) {
                             guiConsola.mensaje("Error en la construcción del mensaje de " + msg.getSender().getLocalName() +
@@ -653,7 +801,8 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                             guiConsola.mensaje("Error inesperado de " + msg.getSender().getLocalName() + "\n" + ex);
                         } break;
                     case ACLMessage.NOT_UNDERSTOOD:
-                        // Juego no implementado en el agente Grupo Juegos
+                        // Juego no implementado en el agente Grupo Juegos seleccionado
+                        // buscamos si hay alternativa posible
                         completarPropuesta();
                         if (!nuevoAgente) {
                             guiConsola.mensaje("No hay agentes para atender la propuesta de juego");

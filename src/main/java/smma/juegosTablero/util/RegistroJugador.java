@@ -21,7 +21,7 @@ public class RegistroJugador implements Comparable<RegistroJugador> {
 
     public RegistroJugador(Jugador jugador) {
         this.jugador = jugador;
-        this.juegosAceptados = 0;
+        this.juegosAceptados = 1;
     }
 
     public Jugador getJugador() {

@@ -5,25 +5,32 @@
  */
 package smma.juegosTablero.util;
 
+import java.io.Serializable;
 import java.util.Objects;
 import juegosTablero.dominio.elementos.ClasificacionJuego;
+import juegosTablero.dominio.elementos.Grupo;
 
 /**
  *
  * @author pedroj
  */
-public class RegistroClasificacionJuego {
+public class RegistroClasificacionJuego implements Serializable {
     private final String idJuego;
+    private final Grupo grupoJuegos;
     private final ClasificacionJuego clasificacion;
 
-    public RegistroClasificacionJuego(String idJuego, ClasificacionJuego clasificacion) {
+    public RegistroClasificacionJuego(String idJuego, Grupo grupoJuegos, ClasificacionJuego clasificacion) {
         this.idJuego = idJuego;
+        this.grupoJuegos = grupoJuegos;
         this.clasificacion = clasificacion;
     }
 
-    
     public String getIdJuego() {
         return idJuego;
+    }
+
+    public Grupo getGrupoJuegos() {
+        return grupoJuegos;
     }
 
     public ClasificacionJuego getClasificacion() {
@@ -32,13 +39,15 @@ public class RegistroClasificacionJuego {
 
     @Override
     public String toString() {
-        return "RegistroJuego{" + "idJuego=" + idJuego + ", clasificacion=" + clasificacion + '}';
+        return "RegistroClasificacionJuego{" + "idJuego= " + idJuego + 
+                "\n\tgrupoJuegos= " + grupoJuegos + "\n\tclasificacion=" + clasificacion + '}';
     }
 
     @Override
     public int hashCode() {
-        int hash = 5;
+        int hash = 7;
         hash = 67 * hash + Objects.hashCode(this.idJuego);
+        hash = 67 * hash + Objects.hashCode(this.grupoJuegos);
         hash = 67 * hash + Objects.hashCode(this.clasificacion);
         return hash;
     }
@@ -56,6 +65,9 @@ public class RegistroClasificacionJuego {
         }
         final RegistroClasificacionJuego other = (RegistroClasificacionJuego) obj;
         if (!Objects.equals(this.idJuego, other.idJuego)) {
+            return false;
+        }
+        if (!Objects.equals(this.grupoJuegos.getNombre(), other.grupoJuegos.getNombre())) {
             return false;
         }
         return true;

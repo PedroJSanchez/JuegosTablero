@@ -1,1 +1,1 @@
-http://10.81.231.230:7778/acc
+http://macmini-de-pedro-j-sanchez.local:7778/acc
