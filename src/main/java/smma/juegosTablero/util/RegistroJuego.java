@@ -6,6 +6,7 @@
 package smma.juegosTablero.util;
 
 import jade.core.AID;
+import jade.util.leap.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -17,9 +18,12 @@ import static smma.juegosTablero.Constantes.NO_HAY_ELEMENTO;
  *
  * @author pedroj
  */
-public class RegistroJuego {
+public class RegistroJuego implements Serializable {
     private final ProponerJuego juegoPropuesto;
     private final List<Jugador> listaJugadores;
+    
+    // Constantes
+    private static final long serialVersionUID = 1L;
 
     public RegistroJuego(ProponerJuego juegoPropuesto) {
         this.juegoPropuesto = juegoPropuesto;
@@ -66,10 +70,10 @@ public class RegistroJuego {
         
         int index = listaJugadores.indexOf(jugador);
         if ( index != NO_HAY_ELEMENTO ) {
-            jugador = listaJugadores.remove(index);
+            resultado = listaJugadores.remove(index);
         }    
         
-        return jugador; 
+        return resultado; 
     }
 
     /**

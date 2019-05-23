@@ -23,8 +23,16 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.proto.ProposeInitiator;
 import jade.proto.SubscriptionInitiator;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -33,8 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Vector;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.concurrent.TimeUnit;
 import juegosTablero.Vocabulario;
 import static juegosTablero.Vocabulario.ModoJuego.TORNEO;
 import static juegosTablero.Vocabulario.ModoJuego.UNICO;
@@ -52,7 +59,6 @@ import juegosTablero.dominio.elementos.Motivacion;
 import juegosTablero.dominio.elementos.ProponerJuego;
 import smma.juegosTablero.gui.Consola;
 import smma.juegosTablero.gui.JuegosTableroJFrame;
-import smma.juegosTablero.Constantes;
 import static juegosTablero.Vocabulario.getOntologia;
 import juegosTablero.dominio.elementos.CompletarJuego;
 import juegosTablero.dominio.elementos.Grupo;
@@ -63,6 +69,13 @@ import smma.juegosTablero.gui.ClasificacionJuegoJFrame;
 import smma.juegosTablero.util.RegistroGrupoJuegos;
 import smma.juegosTablero.util.RegistroJuego;
 import smma.juegosTablero.util.RegistroJugador;
+import smma.juegosTablero.Constantes;
+import static smma.juegosTablero.Constantes.ARCHIVO;
+import static smma.juegosTablero.Constantes.DIRECTORIO;
+import static smma.juegosTablero.Constantes.PREFIJO_ID;
+import static smma.juegosTablero.Constantes.PRIMERO;
+import static smma.juegosTablero.Constantes.SALIDA;
+import smma.juegosTablero.util.RegistroJuegoFinalizado;
 
 /**
  *
@@ -87,7 +100,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     private TipoJuego[] listaJuegos;
 
     // Variables agente
-    private String preIdJuego;
+    private String diaJuego;
     private int numJuego;
     private Gestor agenteCentralJuego;
     private List<AID>[] listaAgentes;
@@ -95,6 +108,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     private List<RegistroJugador>[] registroJugadores;
     private Map<String, RegistroJuego> registroJuegos;
     private List<RegistroJuego> juegosPendientes;
+    private List<RegistroJuegoFinalizado> juegosFinalizados;
     private int[] minJugadores;
     private List<TipoJuego> tipoJuegosActivos;
 
@@ -106,9 +120,6 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     @Override
     protected void setup() {
         // Inicialización de las variables
-        SimpleDateFormat sdf = new SimpleDateFormat(PREFIJO_ID);
-        preIdJuego = sdf.format(new Date()).toString();
-        numJuego = 0;
         agenteCentralJuego = new Gestor("Agente Central Juego", this.getAID());
         guiConsola = new Consola(this);
         guiAgente = new JuegosTableroJFrame(this);
@@ -154,6 +165,18 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
             guiConsola.mensaje("Error al registrar la ontología \n" + ex);
             this.doDelete();
         }
+        
+        try {
+            // Cargar los datos de juegos finalizados anteriormente
+            cargarDatos();
+            guiConsola.mensaje("Cargado el registro de juegos finalizados" 
+                    + "\n\tdia " + diaJuego + " numJuego " + numJuego + "\n\t" + juegosFinalizados);
+        } catch (Exception ex) {
+            numJuego = 1;
+            juegosFinalizados = new ArrayList();
+            guiConsola.mensaje("Inicializamos el registro de juegos finalizados\n" + ex 
+                    + "\n\tdia " + diaJuego + " numJuego " + numJuego + "\n\t" + juegosFinalizados);
+        }
 
         // Añadir tareas principales
         // Suscripción a las páginas amarillas para saber los agentes del juego
@@ -169,11 +192,69 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     @Override
     protected void takeDown() {
         // Liberación de los recursos del agente
-        guiConsola.dispose();
-        guiAgente.dispose();
-        guiAgentesJuego.dispose();
-
-        System.out.println("Finaliza la ejecución de " + this.getName());
+        guiConsola.mensaje("Finalizamos la ejecución del agente " + this.getLocalName() +
+                " en " + SALIDA + " segundos");
+        try {
+            // Almacenar los datos de juegos finalizados
+            guardarDatos();
+            
+            // Esperamos un momento antes de finalizar
+            TimeUnit.SECONDS.sleep(SALIDA);
+        } catch (Exception ex) {
+            guiConsola.mensaje("Error al guardar los datos de juegos finalizados\n" + ex);
+        } finally { 
+            guiConsola.dispose();
+            guiAgente.dispose();
+            guiAgentesJuego.dispose();
+            System.out.println("Finaliza la ejecución de " + this.getName());
+        }
+    }
+    
+    private void cargarDatos() throws Exception {
+        SimpleDateFormat sdf = new SimpleDateFormat(PREFIJO_ID);
+        diaJuego = sdf.format(new Date()).toString();
+        int dia = Integer.parseInt(diaJuego);
+        
+        File directorio = new File(DIRECTORIO);
+        File archivo = new File(DIRECTORIO+ARCHIVO);
+        
+        
+        if ( archivo.exists() ) {
+            FileInputStream fis = new FileInputStream(archivo);
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            ObjectInputStream ois = new ObjectInputStream(bis);
+            juegosFinalizados = (List<RegistroJuegoFinalizado>) ois.readObject();
+            ois.close();
+            
+            if ( juegosFinalizados != null ) {
+                RegistroJuegoFinalizado primero = juegosFinalizados.get(PRIMERO);
+                guiConsola.mensaje("El día es: " + dia + " el último almacenado " + primero.getDia()+
+                        "\ndivision " + Arrays.toString(primero.getIdJuego().split(DIVISOR)));
+                if ( dia == primero.getDia() ) {
+                    numJuego = primero.getNumJuego() + 1;
+                } else {
+                    numJuego = 1;
+                }
+                guiAgente.activaReproduccion(juegosFinalizados);
+            } else {
+                throw new Exception("Inicialización");
+            }
+        } else {
+            directorio.mkdir();
+            throw new Exception("Inicialización");
+        }
+    }
+    
+    private void guardarDatos() throws Exception {
+        File archivo = new File(DIRECTORIO+ARCHIVO);
+        
+        FileOutputStream fos = new FileOutputStream(archivo);
+        BufferedOutputStream bos = new BufferedOutputStream(fos);
+        ObjectOutputStream oos = new ObjectOutputStream(bos);
+        
+        oos.writeObject(juegosFinalizados);
+        oos.close();
+        guiConsola.mensaje("Se ha guardado la información de los juegos finalizados");
     }
 
     private void addAgentesJugador(ACLMessage msg, Juego juego, int numAgentes) {
@@ -361,18 +442,62 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         guiConsola.mensaje(registroJugadores[tipoJuego.ordinal()].toString());
     }
 
-    private void addRegistroGrupoJuegos(Grupo agenteGrupo, Juego juego) {
+    private void addRegistroGrupoJuegos(Grupo grupoJuego, Juego juego) {
         TipoJuego tipoJuego = juego.getTipoJuego();
-        RegistroGrupoJuegos registroGrupo = new RegistroGrupoJuegos(agenteGrupo);
+        RegistroGrupoJuegos registroGrupo = new RegistroGrupoJuegos(grupoJuego);
         int indice = registroGrupoJuegos[tipoJuego.ordinal()].indexOf(registroGrupo);
         if (indice == NO_HAY_ELEMENTO) {
             // No se ha contactado antes con este agente de grupo de juegos
             registroGrupoJuegos[tipoJuego.ordinal()].add(registroGrupo);
-            addSuscripcion(agenteGrupo.getAgenteGrupoJuegos(),juego.getTipoJuego());
+            addSuscripcion(grupoJuego.getAgenteGrupoJuegos(),juego.getTipoJuego());
         }
         
         // Eliminamos el juego del registro pendiente y espera a que sea completado
-        registroJuegos.remove(juego.getIdJuego());
+        String idJuego = juego.getIdJuego();
+        RegistroJuego detalleJuego = registroJuegos.remove(idJuego);
+        indice = juegosFinalizados.indexOf(new RegistroJuegoFinalizado(idJuego));
+        if ( indice == NO_HAY_ELEMENTO ) {
+            RegistroJuegoFinalizado juegoActivo = new RegistroJuegoFinalizado(idJuego, grupoJuego, detalleJuego);
+            juegosFinalizados.add(juegoActivo);
+        }
+    }
+    
+    /**
+     * Comprueba si el agente central tiene localizado al agente que representa
+     * al grupo de juego.
+     * 
+     * @param grupoJuego
+     * @param tipoJuego
+     * @return true si el grupo de juego está presente
+     */
+    public boolean disponibleGrupoJuego(Grupo grupoJuego, TipoJuego tipoJuego) {
+        boolean resultado = false;
+        
+        int indice = registroGrupoJuegos[tipoJuego.ordinal()].indexOf(grupoJuego);
+        
+        guiConsola.mensaje("Grupo Juego " + grupoJuego + " encontrado " + indice);
+        
+        if ( indice != NO_HAY_ELEMENTO ) {
+            resultado = true;
+        }
+        
+        return resultado;
+    }
+    
+    private void addResultadoJuego(Juego juego, Predicate elemento) {
+        int indice;
+        String idJuego = juego.getIdJuego();
+        
+        indice = juegosFinalizados.indexOf(new RegistroJuegoFinalizado(idJuego));
+        if ( indice == NO_HAY_ELEMENTO ) {
+            guiConsola.mensaje("ERROR: no se ha encontrado el juego " + juego);
+        } else if ( juegosFinalizados.get(indice).getResultadoJuego() != null ) {
+            guiConsola.mensaje("Finalizada la REPRODUCCION del juego " + idJuego);
+        } else {  
+            juegosFinalizados.get(indice).setResultadoJuego(elemento);
+            guiAgente.activaReproduccion(juegosFinalizados);
+            guiConsola.mensaje("Se completa el juego " + idJuego + " con el resultado");
+        }
     }
 
     /**
@@ -407,8 +532,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         ProponerJuego proponerJuego;
         Juego juego;
         
-        numJuego++;
-        String idJuego = tipoJuego.name() + "_" + preIdJuego + "-"+ numJuego;
+        String idJuego = tipoJuego.name() + "-" + diaJuego + "-"+ numJuego;
         proponerJuego = new ProponerJuego();
         juego = new Juego(idJuego, victorias, modoJuego, tipoJuego);
         proponerJuego.setJuego(juego);
@@ -426,6 +550,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         
         // Registramos el juego
         addRegistroJuego(proponerJuego);
+        numJuego++;
 
         ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
         msg.setProtocol(FIPANames.InteractionProtocol.FIPA_PROPOSE);
@@ -453,6 +578,48 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
             addJuegoPendiente(juego);
         } 
     }
+    
+    public void reproducirJuego(int indiceJuego) {
+        RegistroJuegoFinalizado finalizado = juegosFinalizados.get(indiceJuego);
+        RegistroJuego juegoRegistrado = finalizado.getDetalleJuego();
+        Grupo grupoJuego = finalizado.getGrupoJuegos();
+        Juego juego = juegoRegistrado.getJuegoPropuesto().getJuego();
+        TipoJuego tipoJuego = juego.getTipoJuego();
+        Concept condicionesJuego = juegoRegistrado.getJuegoPropuesto().getTipoJuego();
+        List listaJugadores = juegoRegistrado.getListaJugadores();
+        CompletarJuego completarJuego = new CompletarJuego(juego, condicionesJuego, 
+                                                     new jade.util.leap.ArrayList((ArrayList) listaJugadores));
+        
+        // Creamos el mensaje
+        ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
+        msg.setProtocol(FIPANames.InteractionProtocol.FIPA_PROPOSE);
+        msg.setSender(getAID());
+        msg.setLanguage(codec.getName());
+        msg.setOntology(listaOntologias[tipoJuego.ordinal()].getName());
+        AID agenteGrupo = grupoJuego.getAgenteGrupoJuegos();
+        if( listaAgentes[GRUPO_JUEGOS.ordinal()].contains(agenteGrupo) ) {
+            msg.addReceiver(agenteGrupo);
+        }
+        msg.setReplyByDate(new Date(System.currentTimeMillis() + TIME_OUT));
+        
+        if ( msg.getAllReceiver().hasNext() ) {
+            Action ac = new Action(this.getAID(), completarJuego);
+            
+            try {
+                manager[tipoJuego.ordinal()].fillContent(msg, ac);
+            } catch (Codec.CodecException | OntologyException ex) {
+                guiConsola.mensaje("Error en la construcción del mensaje en Completar Juego \n" + ex);
+            }
+
+            guiConsola.mensaje("Reproducir " + msg);
+            addBehaviour(new TareaCompletarJuego(this, msg, juego, true));
+        } else {
+            // No hay agentes disponibles para el juego
+            guiConsola.mensaje("No está disponible el grupo de juego: " + grupoJuego + 
+                    " para reproducir el juego: " + juego);
+        }
+        
+    } 
 
     public void completarJuego(int indiceAgente, String idJuego) {
         RegistroJuego juegoRegistrado = registroJuegos.get(idJuego);
@@ -482,7 +649,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
             }
 
             guiConsola.mensaje(msg.toString());
-            addBehaviour(new TareaCompletarJuego(this, msg, juego));
+            addBehaviour(new TareaCompletarJuego(this, msg, juego, false));
         } else {
             // No hay agentes disponibles para el juego
             guiConsola.mensaje("No hay grupo de juegos posibles para completar: " + juego);
@@ -748,11 +915,13 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
     class TareaCompletarJuego extends ProposeInitiator {
         private final Juego juego;
         private final List agentesContactados;
+        private final boolean reproduccion;
         private boolean nuevoAgente;
 
-        public TareaCompletarJuego(Agent a, ACLMessage msg, Juego juego) {
+        public TareaCompletarJuego(Agent a, ACLMessage msg, Juego juego, boolean reproduccion) {
             super(a, msg);
             this.juego = juego;
+            this.reproduccion = reproduccion;
             agentesContactados = new ArrayList();
 
             // Almacenamos con el primero que contactamos inicialmente 
@@ -792,8 +961,12 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                     case ACLMessage.REJECT_PROPOSAL:
                         try {
                             Motivacion motivacion = (Motivacion) manager[tipoJuego.ordinal()].extractContent(msg);
-                            guiConsola.mensaje(motivacion.toString() + "\nBuscamos un agente grupo de juego alternativo");
-                            completarPropuesta();
+                            if ( !reproduccion ) {
+                                guiConsola.mensaje(motivacion.toString() + "\nBuscamos un agente grupo de juego alternativo");
+                                completarPropuesta();
+                            } else {
+                                guiConsola.mensaje("Error al reproducir el juego: " + juego);
+                            }
                         } catch (Codec.CodecException | OntologyException ex) {
                             guiConsola.mensaje("Error en la construcción del mensaje de " + msg.getSender().getLocalName() +
                                     "\n" + msg);
@@ -803,10 +976,14 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                     case ACLMessage.NOT_UNDERSTOOD:
                         // Juego no implementado en el agente Grupo Juegos seleccionado
                         // buscamos si hay alternativa posible
-                        completarPropuesta();
-                        if (!nuevoAgente) {
-                            guiConsola.mensaje("No hay agentes para atender la propuesta de juego");
-                        }   break;
+                        if ( !reproduccion ) {
+                            completarPropuesta();
+                            if (!nuevoAgente) {
+                                guiConsola.mensaje("No hay agentes para atender la propuesta de juego");
+                            }
+                        } else {
+                            guiConsola.mensaje("Error al reproducir el juego: " + juego);
+                        } break;
                     default:
                         break;
                 }
@@ -855,6 +1032,8 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                 }
                 
                 reset(msg);
+            } else {
+                guiConsola.mensaje("No hay agentes para atender la propuesta de juego");
             }
         }
     }
@@ -879,6 +1058,7 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         protected void handleInform(ACLMessage inform) {
             // Versión preliminar
             Predicate elemento;
+            Juego juego;
             
             // Buscamos la ontología del mensaje
             int indiceJuego = buscarIndiceJuego(inform.getOntology());
@@ -890,21 +1070,25 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
                     // Presentamos la clasificación del juego
                     ClasificacionJuegoJFrame guiClasificacion;
                     ClasificacionJuego clasificacion = (ClasificacionJuego) elemento;
+                    juego = clasificacion.getJuego();
                     guiClasificacion = new ClasificacionJuegoJFrame(clasificacion);
-                    guiConsola.mensaje("Fin Juego \n" + clasificacion.getJuego() + "\n" +
+                    guiConsola.mensaje("Fin Juego \n" + juego + "\n" +
                             clasificacion.getListaJugadores() + "\n" + clasificacion.getListaPuntuacion());
                 } else {
                     // Ha ocurrido un problema en el juego
                     IncidenciaJuego incidencia = (IncidenciaJuego) elemento;
-                    guiConsola.mensaje("Error en el juego " + incidencia.getJuego() + "\n" 
+                    juego = incidencia.getJuego();
+                    guiConsola.mensaje("Error en el juego " + juego + "\n" 
                                        + " por " + incidencia.getDetalle());
                 }
+                
+                // Guardamos el resultado del juego finalizado
+                addResultadoJuego(juego, elemento);
             } catch (Codec.CodecException | OntologyException ex) {
                 guiConsola.mensaje("Error en el formato del mensaje del agente " + 
                                 inform.getSender().getLocalName());
             } catch ( Exception ex ) {
-               guiConsola.mensaje("Error inesperado de\n" + ex);
-               Logger.getLogger(AgenteCentralJuego.class.getName()).log(Level.SEVERE, null, ex);         
+               guiConsola.mensaje("Error inesperado de\n" + ex);      
             }
         }
 

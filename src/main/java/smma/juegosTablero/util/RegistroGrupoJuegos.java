@@ -20,7 +20,7 @@ import static smma.juegosTablero.Constantes.PRIMERO;
  */
 public class RegistroGrupoJuegos implements Comparable<RegistroGrupoJuegos> {
     private final Grupo grupoJuegos;
-    private final List<RegistroClasificacionJuego> listaJuegos;
+    private final List<RegistroJuegoFinalizado> listaJuegos;
 
     public RegistroGrupoJuegos(Grupo grupoJuegos) {
         this.grupoJuegos = grupoJuegos;
@@ -35,15 +35,15 @@ public class RegistroGrupoJuegos implements Comparable<RegistroGrupoJuegos> {
         return listaJuegos.size();
     }
     
-    public void addJuego( RegistroClasificacionJuego juego ) {
+    public void addJuego( RegistroJuegoFinalizado juego ) {
         listaJuegos.add(juego);
     }
     
-    public RegistroClasificacionJuego getJuego() {
+    public RegistroJuegoFinalizado getJuego() {
         return listaJuegos.get(PRIMERO);
     }
     
-    public RegistroClasificacionJuego getJuego(RegistroClasificacionJuego juego) {
+    public RegistroJuegoFinalizado getJuego(RegistroJuegoFinalizado juego) {
         int indice = listaJuegos.indexOf(juego);
         return listaJuegos.get(indice);
     }
@@ -77,6 +77,7 @@ public class RegistroGrupoJuegos implements Comparable<RegistroGrupoJuegos> {
         if (!Objects.equals(this.grupoJuegos.getAgenteGrupoJuegos(), other.grupoJuegos.getAgenteGrupoJuegos())) {
             return false;
         }
+        
         return true;
     }
 

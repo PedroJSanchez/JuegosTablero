@@ -15,6 +15,7 @@ import smma.juegosTablero.Constantes.Enfrentamiento;
 import static smma.juegosTablero.Constantes.VACIO;
 import smma.juegosTablero.agentes.AgenteCentralJuego;
 import smma.juegosTablero.util.RegistroJuego;
+import smma.juegosTablero.util.RegistroJuegoFinalizado;
 
 /**
  *
@@ -22,6 +23,7 @@ import smma.juegosTablero.util.RegistroJuego;
  */
 public class JuegosTableroJFrame extends javax.swing.JFrame {
     private final AgenteCentralJuego agente;
+    private OkCancelDialog finalizacion;
 
     /**
      * Creates new form Consola
@@ -85,8 +87,18 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
         }
     }
     
-    public void activaReproduccion() {
+    public void activaReproduccion(List<RegistroJuegoFinalizado> juegosFinalizados) {
+        jComboBoxJuegosFin.removeAllItems();
         
+        if( juegosFinalizados.isEmpty() ) {
+            anulaReproduccion();
+        } else {
+            for( RegistroJuegoFinalizado juego : juegosFinalizados ) {
+                jComboBoxJuegosFin.addItem(juego.getIdJuego());
+            }
+            
+            reproducirJuego.setEnabled(true);
+        }
     }
     
     public void anulaPendiente() {
@@ -95,7 +107,7 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
     }
     
     public void anulaReproduccion() {
-        
+        reproducirJuego.setEnabled(false);
     }
     
     public void anulaProponerJuego() {
@@ -123,12 +135,12 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
             if ( jComboBoxJuegos.getItemCount() > VACIO ) {
                 completarJuego.setEnabled(true);
             } else if ( jComboBoxJuegosFin.getItemCount() > VACIO ) {
-                juegoCompletado.setEnabled(true);
+                reproducirJuego.setEnabled(true);
             }
             
         } else {
             completarJuego.setEnabled(false);
-            juegoCompletado.setEnabled(false);
+            reproducirJuego.setEnabled(false);
         }
     }
     
@@ -149,7 +161,7 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
         jLabel6 = new javax.swing.JLabel();
         jLabel7 = new javax.swing.JLabel();
         jComboBoxJuegosFin = new javax.swing.JComboBox<>();
-        juegoCompletado = new javax.swing.JButton();
+        reproducirJuego = new javax.swing.JButton();
         jPanel2 = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
         jComboBoxTipoJuego = new javax.swing.JComboBox<>();
@@ -190,11 +202,11 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
 
         jLabel7.setText("Juegos Completados");
 
-        juegoCompletado.setText("Juego Completado");
-        juegoCompletado.setEnabled(false);
-        juegoCompletado.addActionListener(new java.awt.event.ActionListener() {
+        reproducirJuego.setText("Reproducir Juego");
+        reproducirJuego.setEnabled(false);
+        reproducirJuego.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                juegoCompletadoActionPerformed(evt);
+                reproducirJuegoActionPerformed(evt);
             }
         });
 
@@ -215,12 +227,12 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel7)
                             .addComponent(jComboBoxJuegosFin, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGap(0, 106, Short.MAX_VALUE))
+                        .addGap(0, 126, Short.MAX_VALUE))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
                         .addGap(0, 0, Short.MAX_VALUE)
                         .addComponent(completarJuego)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(juegoCompletado)))
+                        .addComponent(reproducirJuego)))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -241,7 +253,7 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
                 .addGap(28, 28, 28)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(completarJuego)
-                    .addComponent(juegoCompletado))
+                    .addComponent(reproducirJuego))
                 .addContainerGap())
         );
 
@@ -364,7 +376,8 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
 
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
         // TODO add your handling code here:
-        
+        finalizacion = new OkCancelDialog(this, true, agente);
+        finalizacion.setVisible(true);
     }//GEN-LAST:event_formWindowClosing
 
     private void completarJuegoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_completarJuegoActionPerformed
@@ -417,9 +430,12 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
         agente.juegoPendiente(index);
     }//GEN-LAST:event_juegoPendienteActionPerformed
 
-    private void juegoCompletadoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_juegoCompletadoActionPerformed
+    private void reproducirJuegoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_reproducirJuegoActionPerformed
         // TODO add your handling code here:
-    }//GEN-LAST:event_juegoCompletadoActionPerformed
+        int index = jComboBoxJuegosFin.getSelectedIndex();
+        
+        agente.reproducirJuego(index);
+    }//GEN-LAST:event_reproducirJuegoActionPerformed
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
@@ -441,9 +457,9 @@ public class JuegosTableroJFrame extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel7;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
-    private javax.swing.JButton juegoCompletado;
     private javax.swing.JButton juegoPendiente;
     private javax.swing.JButton proponerJuego;
+    private javax.swing.JButton reproducirJuego;
     // End of variables declaration//GEN-END:variables
 
 }

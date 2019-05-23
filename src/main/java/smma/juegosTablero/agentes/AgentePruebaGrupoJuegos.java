@@ -50,10 +50,10 @@ import juegosTablero.dominio.elementos.JuegoAceptado;
 import juegosTablero.dominio.elementos.Jugador;
 import juegosTablero.dominio.elementos.Motivacion;
 import smma.juegosTablero.gui.Consola;
-import smma.juegosTablero.Constantes;
 import static smma.juegosTablero.Constantes.AFIRMATIVA;
 import static smma.juegosTablero.Constantes.D10;
 import smma.juegosTablero.util.GestorSuscripciones;
+import smma.juegosTablero.Constantes;
 
 /**
  *

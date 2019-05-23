@@ -78,13 +78,13 @@
                               <Component id="jLabel7" min="-2" max="-2" attributes="0"/>
                               <Component id="jComboBoxJuegosFin" min="-2" max="-2" attributes="0"/>
                           </Group>
-                          <EmptySpace min="0" pref="106" max="32767" attributes="0"/>
+                          <EmptySpace min="0" pref="126" max="32767" attributes="0"/>
                       </Group>
                       <Group type="102" alignment="1" attributes="0">
                           <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                           <Component id="completarJuego" min="-2" max="-2" attributes="0"/>
                           <EmptySpace max="-2" attributes="0"/>
-                          <Component id="juegoCompletado" min="-2" max="-2" attributes="0"/>
+                          <Component id="reproducirJuego" min="-2" max="-2" attributes="0"/>
                       </Group>
                   </Group>
                   <EmptySpace max="-2" attributes="0"/>
@@ -111,7 +111,7 @@
                   <EmptySpace min="-2" pref="28" max="-2" attributes="0"/>
                   <Group type="103" groupAlignment="3" attributes="0">
                       <Component id="completarJuego" alignment="3" min="-2" max="-2" attributes="0"/>
-                      <Component id="juegoCompletado" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Component id="reproducirJuego" alignment="3" min="-2" max="-2" attributes="0"/>
                   </Group>
                   <EmptySpace max="-2" attributes="0"/>
               </Group>
@@ -176,13 +176,13 @@
             <AuxValue name="JavaCodeGenerator_TypeParameters" type="java.lang.String" value="&lt;String&gt;"/>
           </AuxValues>
         </Component>
-        <Component class="javax.swing.JButton" name="juegoCompletado">
+        <Component class="javax.swing.JButton" name="reproducirJuego">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Juego Completado"/>
+            <Property name="text" type="java.lang.String" value="Reproducir Juego"/>
             <Property name="enabled" type="boolean" value="false"/>
           </Properties>
           <Events>
-            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="juegoCompletadoActionPerformed"/>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="reproducirJuegoActionPerformed"/>
           </Events>
         </Component>
       </SubComponents>
