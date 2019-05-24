@@ -169,8 +169,6 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
         try {
             // Cargar los datos de juegos finalizados anteriormente
             cargarDatos();
-            guiConsola.mensaje("Cargado el registro de juegos finalizados" 
-                    + "\n\tdia " + diaJuego + " numJuego " + numJuego + "\n\t" + juegosFinalizados);
         } catch (Exception ex) {
             numJuego = 1;
             juegosFinalizados = new ArrayList();
@@ -227,15 +225,17 @@ public class AgenteCentralJuego extends Agent implements Constantes, Vocabulario
             ois.close();
             
             if ( juegosFinalizados != null ) {
+                Collections.sort(juegosFinalizados);
                 RegistroJuegoFinalizado primero = juegosFinalizados.get(PRIMERO);
-                guiConsola.mensaje("El día es: " + dia + " el último almacenado " + primero.getDia()+
-                        "\ndivision " + Arrays.toString(primero.getIdJuego().split(DIVISOR)));
                 if ( dia == primero.getDia() ) {
                     numJuego = primero.getNumJuego() + 1;
                 } else {
                     numJuego = 1;
                 }
                 guiAgente.activaReproduccion(juegosFinalizados);
+                guiConsola.mensaje("El último almacenado " + primero.getDia() + " el día de hoy: " + dia +
+                        " el siguiente juego para el día es: " + numJuego +
+                        "\ndivision " + Arrays.toString(primero.getIdJuego().split(DIVISOR)));
             } else {
                 throw new Exception("Inicialización");
             }
